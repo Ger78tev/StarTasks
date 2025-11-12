@@ -1,42 +1,115 @@
-import mysql.connector
-from mysql.connector import Error
+import psycopg2
+from psycopg2 import Error
 import os
 import time
 
 class Database:
     def __init__(self):
-        # Configuración CORREGIDA para Railway - usar MYSQL* variables
+        # Configuración para PostgreSQL en Railway
         self.config = {
-            'host': os.environ.get('MYSQLHOST', os.environ.get('DB_HOST', 'localhost')),
-            'user': os.environ.get('MYSQLUSER', os.environ.get('DB_USER', 'root')),
-            'password': os.environ.get('MYSQLPASSWORD', os.environ.get('DB_PASSWORD', '')),
-            'database': os.environ.get('MYSQLDATABASE', os.environ.get('DB_NAME', 'startask')),
-            'port': int(os.environ.get('MYSQLPORT', os.environ.get('DB_PORT', 3306))),
-            'charset': 'utf8mb4',
-            'collation': 'utf8mb4_unicode_ci',
-            'connect_timeout': 30,
-            'autocommit': True,
-            # FORZAR conexión TCP en lugar de socket
-            'use_pure': True,
-            'unix_socket': None
+            'host': os.environ.get('PGHOST', 'localhost'),
+            'user': os.environ.get('PGUSER', 'postgres'),
+            'password': os.environ.get('PGPASSWORD', ''),
+            'database': os.environ.get('PGDATABASE', 'startask'),
+            'port': int(os.environ.get('PGPORT', 5432)),
+            'connect_timeout': 10
         }
     
     def conectar(self):
-        """Establece conexión con la base de datos MySQL en Railway"""
+        """Establece conexión con PostgreSQL en Railway"""
         try:
-            # Mostrar configuración (sin password)
-            safe_config = self.config.copy()
-            safe_config['password'] = '***'
-            print(f"🔧 Intentando conectar a: {safe_config['host']}:{safe_config['port']}")
-            
-            connection = mysql.connector.connect(**self.config)
-            if connection.is_connected():
-                print(f"✅ Conectado a MySQL en Railway - DB: {self.config['database']}")
-                return connection
+            print(f"🔗 Conectando a PostgreSQL: {self.config['host']}:{self.config['port']}")
+            connection = psycopg2.connect(**self.config)
+            connection.autocommit = True
+            print("✅ Conectado a PostgreSQL en Railway")
+            return connection
         except Error as e:
-            print(f"❌ Error conectando a MySQL: {e}")
-            print(f"📋 Configuración usada: host={self.config['host']}, port={self.config['port']}, user={self.config['user']}")
+            print(f"❌ Error conectando a PostgreSQL: {e}")
             return None
+    
+    def crear_tablas_completas(self):
+        """Crear todas las tablas necesarias para StarTask en PostgreSQL"""
+        conn = self.conectar()
+        if not conn:
+            return False
+            
+        try:
+            cursor = conn.cursor()
+            
+            # Tabla de usuarios
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS usuarios (
+                    id SERIAL PRIMARY KEY,
+                    nombre VARCHAR(100) NOT NULL,
+                    email VARCHAR(100) UNIQUE NOT NULL,
+                    password VARCHAR(255) NOT NULL,
+                    rol VARCHAR(20) NOT NULL CHECK (rol IN ('Administrador', 'Líder de Proyecto', 'Colaborador')),
+                    estado VARCHAR(10) DEFAULT 'activo' CHECK (estado IN ('activo', 'inactivo')),
+                    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # Tabla de proyectos
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS proyectos (
+                    id SERIAL PRIMARY KEY,
+                    nombre VARCHAR(200) NOT NULL,
+                    descripcion TEXT,
+                    fecha_inicio DATE,
+                    fecha_fin DATE,
+                    estado VARCHAR(15) DEFAULT 'activo' CHECK (estado IN ('activo', 'inactivo', 'completado')),
+                    id_lider INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+                    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # Tabla de tareas
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS tareas (
+                    id SERIAL PRIMARY KEY,
+                    titulo VARCHAR(200) NOT NULL,
+                    descripcion TEXT,
+                    id_proyecto INTEGER REFERENCES proyectos(id) ON DELETE CASCADE,
+                    id_asignado INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+                    estado VARCHAR(15) DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'en_progreso', 'completada')),
+                    prioridad VARCHAR(10) DEFAULT 'media' CHECK (prioridad IN ('baja', 'media', 'alta')),
+                    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    fecha_vencimiento DATE,
+                    estado_registro VARCHAR(10) DEFAULT 'activo' CHECK (estado_registro IN ('activo', 'inactivo'))
+                )
+            """)
+            
+            # Insertar datos iniciales
+            cursor.execute("""
+                INSERT INTO usuarios (id, nombre, email, password, rol) 
+                VALUES 
+                (1, 'Gerald Baños', 'gerald@startask.com', 'gerald123', 'Administrador'),
+                (2, 'David Salazar', 'david@startask.com', 'david123', 'Líder de Proyecto'),
+                (3, 'Sebastian Suarez', 'sebastian@startask.com', 'sebastian123', 'Colaborador')
+                ON CONFLICT (id) DO NOTHING
+            """)
+            
+            cursor.execute("""
+                INSERT INTO proyectos (id, nombre, descripcion, id_lider) 
+                VALUES (1, 'Proyecto Demo StarTask', 'Proyecto de demostración del sistema', 2)
+                ON CONFLICT (id) DO NOTHING
+            """)
+            
+            conn.commit()
+            print("✅ Tablas PostgreSQL creadas correctamente")
+            return True
+            
+        except Error as e:
+            print(f"❌ Error creando tablas: {e}")
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+
+# Función de inicialización
+def inicializar_base_datos():
+    db = Database()
+    return db.crear_tablas_completas()
     
     def verificar_conexion(self):
         """Verifica que la conexión a la base de datos funcione"""
