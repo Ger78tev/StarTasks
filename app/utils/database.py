@@ -1,50 +1,67 @@
 import mysql.connector
 from mysql.connector import Error
 import os
+import time
 
 class Database:
     def __init__(self):
-        # Configuración para Railway con variables de entorno MYSQL*
+        # Configuración CORREGIDA para Railway - usar MYSQL* variables
         self.config = {
-            'host': os.environ.get('MYSQLHOST', 'localhost'),
-            'user': os.environ.get('MYSQLUSER', 'root'),
-            'password': os.environ.get('MYSQLPASSWORD', ''),
-            'database': os.environ.get('MYSQLDATABASE', 'startask'),
-            'port': int(os.environ.get('MYSQLPORT', '3306')),
+            'host': os.environ.get('MYSQLHOST', os.environ.get('DB_HOST', 'localhost')),
+            'user': os.environ.get('MYSQLUSER', os.environ.get('DB_USER', 'root')),
+            'password': os.environ.get('MYSQLPASSWORD', os.environ.get('DB_PASSWORD', '')),
+            'database': os.environ.get('MYSQLDATABASE', os.environ.get('DB_NAME', 'startask')),
+            'port': int(os.environ.get('MYSQLPORT', os.environ.get('DB_PORT', 3306))),
             'charset': 'utf8mb4',
             'collation': 'utf8mb4_unicode_ci',
             'connect_timeout': 30,
-            'autocommit': True
+            'autocommit': True,
+            # FORZAR conexión TCP en lugar de socket
+            'use_pure': True,
+            'unix_socket': None
         }
     
     def conectar(self):
         """Establece conexión con la base de datos MySQL en Railway"""
         try:
+            # Mostrar configuración (sin password)
+            safe_config = self.config.copy()
+            safe_config['password'] = '***'
+            print(f"🔧 Intentando conectar a: {safe_config['host']}:{safe_config['port']}")
+            
             connection = mysql.connector.connect(**self.config)
             if connection.is_connected():
-                print(f"✅ Conectado a MySQL - DB: {self.config['database']}")
+                print(f"✅ Conectado a MySQL en Railway - DB: {self.config['database']}")
                 return connection
         except Error as e:
             print(f"❌ Error conectando a MySQL: {e}")
+            print(f"📋 Configuración usada: host={self.config['host']}, port={self.config['port']}, user={self.config['user']}")
             return None
     
     def verificar_conexion(self):
         """Verifica que la conexión a la base de datos funcione"""
-        conn = self.conectar()
-        if conn:
-            cursor = conn.cursor()
-            try:
-                cursor.execute("SELECT 1")
-                print("✅ Conexión a la base de datos verificada correctamente")
-                return True
-            except Error as e:
-                print(f"❌ Error en verificación: {e}")
-                return False
-            finally:
-                cursor.close()
-                conn.close()
+        max_retries = 3
+        for attempt in range(max_retries):
+            print(f"🔍 Intento de conexión {attempt + 1}/{max_retries}...")
+            conn = self.conectar()
+            if conn:
+                cursor = conn.cursor()
+                try:
+                    cursor.execute("SELECT 1")
+                    print("✅ Conexión a la base de datos verificada correctamente")
+                    return True
+                except Error as e:
+                    print(f"❌ Error en verificación: {e}")
+                    return False
+                finally:
+                    cursor.close()
+                    conn.close()
+            else:
+                print(f"⏳ Esperando 5 segundos antes de reintentar...")
+                time.sleep(5)
+        
+        print("❌ No se pudo conectar después de varios intentos")
         return False
-
     # ... (mantener el resto de tus métodos existentes)
 
 class Database:
@@ -405,4 +422,5 @@ def inicializar_base_datos():
 if __name__ == "__main__":
 
     inicializar_base_datos()
+
 
