@@ -6,6 +6,52 @@ class Database:
     def __init__(self):
         # Configuración para Railway con variables de entorno
         self.config = {
+            'host': os.environ.get('MYSQLHOST', 'localhost'),
+            'user': os.environ.get('MYSQLUSER', 'root'),
+            'password': os.environ.get('MYSQLPASSWORD', ''),
+            'database': os.environ.get('MYSQLDATABASE', 'startask'),
+            'port': int(os.environ.get('MYSQLPORT', '3306')),
+            'charset': 'utf8mb4',
+            'collation': 'utf8mb4_unicode_ci',
+            'connect_timeout': 30,
+            'autocommit': True
+        }
+    
+    def conectar(self):
+        """Establece conexión con la base de datos MySQL en Railway"""
+        try:
+            connection = mysql.connector.connect(**self.config)
+            if connection.is_connected():
+                print(f"✅ Conectado a MySQL en Railway - DB: {self.config['database']}")
+                return connection
+        except Error as e:
+            print(f"❌ Error conectando a MySQL en Railway: {e}")
+            print(f"🔧 Configuración usada: host={self.config['host']}, user={self.config['user']}, db={self.config['database']}")
+            return None
+    
+    def verificar_conexion(self):
+        """Verifica que la conexión a la base de datos funcione"""
+        conn = self.conectar()
+        if conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute("SELECT 1")
+                print("✅ Conexión a la base de datos verificada correctamente")
+                return True
+            except Error as e:
+                print(f"❌ Error en verificación de base de datos: {e}")
+                return False
+            finally:
+                cursor.close()
+                conn.close()
+        return False
+
+    # Mantener los otros métodos que necesites...
+
+class Database:
+    def __init__(self):
+        # Configuración para Railway con variables de entorno
+        self.config = {
             'host': os.environ.get('DB_HOST', 'localhost'),
             'user': os.environ.get('DB_USER', 'root'),
             'password': os.environ.get('DB_PASSWORD', ''),
@@ -16,19 +62,6 @@ class Database:
             'connect_timeout': 30
         }
     
-    def conectar(self):
-        """Establece conexión con la base de datos MySQL"""
-        try:
-            connection = mysql.connector.connect(**self.config)
-            if connection.is_connected():
-                print("✅ Conectado a MySQL en Railway")
-                return connection
-        except Error as e:
-            print(f"❌ Error conectando a MySQL: {e}")
-            # En Railway, no podemos crear la BD automáticamente
-            return None
-    
-    # ... (el resto del código se mantiene igual)
     
     def crear_base_datos(self):
         """Crea la base de datos si no existe"""
@@ -325,4 +358,5 @@ def inicializar_base_datos():
 
 # Si se ejecuta este archivo directamente, inicializar la base de datos
 if __name__ == "__main__":
+
     inicializar_base_datos()
