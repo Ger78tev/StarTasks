@@ -68,3 +68,4 @@ if __name__ == '__main__':
         app.run(debug=debug_mode, host='0.0.0.0', port=port)
     else:
         print("❌ No se pudo iniciar la aplicación - Verifica la configuración")
+
