@@ -3,7 +3,7 @@ import os
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'startask_railway_production_secret_key_2024')
     
-    # Configuración para MySQL en Railway (usando variables MYSQL*)
+    # Usar variables MYSQL* de Railway (se crean automáticamente)
     DB_HOST = os.environ.get('MYSQLHOST', 'localhost')
     DB_USER = os.environ.get('MYSQLUSER', 'root')
     DB_PASSWORD = os.environ.get('MYSQLPASSWORD', '')
